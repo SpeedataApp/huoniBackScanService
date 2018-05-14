@@ -10,7 +10,6 @@ import android.hardware.Camera;
 import android.os.IBinder;
 import android.support.annotation.Nullable;
 import android.util.Log;
-import android.widget.Toast;
 
 import com.honeywell.barcode.ActiveCamera;
 import com.honeywell.barcode.HSMDecodeResult;
@@ -31,6 +30,7 @@ public class BService extends Service implements HuoniScan.DisplayBarcodeDataLis
     private Camera camera1;
     public Camera.Parameters parameters1;
     private Intent intents = new Intent();
+    private Intent intent = new Intent();
 
     @Override
     public void onCreate() {
@@ -76,7 +76,6 @@ public class BService extends Service implements HuoniScan.DisplayBarcodeDataLis
                             }
                             startService(intents);
                         }
-
                     } else {
                         if (isWorked(BService.this)) {
                             stopService(intents);
@@ -150,22 +149,16 @@ public class BService extends Service implements HuoniScan.DisplayBarcodeDataLis
         intent.setAction("com.huoniBack.barcode");
     }
 
-    private Intent intent = new Intent();
-
     @Override
     public void displayBarcodeData(String s, long l, HSMDecodeResult[] hsmDecodeResults) {
         Log.i("stw", "displayBarcodeData: 解码 ");
-        StringBuilder result = new StringBuilder();
-
+//        StringBuilder result = new StringBuilder();
         String[] codeBytes = new String[hsmDecodeResults.length];
-
         for (int i = 0; i < hsmDecodeResults.length; i++) {
             codeBytes[i] = hsmDecodeResults[i].getBarcodeData();
 //            String bar = hsmDecodeResults[i].getBarcodeData();
 //            result.append("解码" + i + ":" + bar + "\n");
         }
-
-
         intent.putExtra("huoniBack", codeBytes);
         //发送广播
         sendBroadcast(intent);
@@ -176,7 +169,7 @@ public class BService extends Service implements HuoniScan.DisplayBarcodeDataLis
     @Override
     public void onDestroy() {
         super.onDestroy();
-        Toast.makeText(this, "服务被关闭", Toast.LENGTH_SHORT).show();
+//        Toast.makeText(this, "服务被关闭", Toast.LENGTH_SHORT).show();
         if (isWorked(this)) {
             stopService(intents);
         }
