@@ -140,7 +140,7 @@ public class BService extends Service implements HuoniScan.DisplayBarcodeDataLis
         cameraManager.reopenCamera();
         camera1 = cameraManager.getCamera();
         parameters1 = camera1.getParameters();
-        parameters1.setExposureCompensation(-1);
+        parameters1.setExposureCompensation(-3);
         parameters1.setAutoWhiteBalanceLock(true);
         parameters1.setColorEffect(Camera.Parameters.EFFECT_MONO);
         parameters1.setPreviewSize(1920, 1080);
