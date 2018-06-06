@@ -8,6 +8,8 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.hardware.Camera;
 import android.os.IBinder;
+import android.os.SystemClock;
+import android.os.SystemProperties;
 import android.support.annotation.Nullable;
 import android.util.Log;
 
@@ -31,13 +33,20 @@ public class BService extends Service implements HuoniScan.DisplayBarcodeDataLis
     public Camera.Parameters parameters1;
     private Intent intents = new Intent();
     private Intent intent = new Intent();
+    private final String HOME_STATE = "com.geenk.action.HOMEKEY_SWITCH_STATE";//设置home按键是否可用
+    private final String STATUSBAR_STATE = "com.geenk.action.STATUSBAR_SWITCH_STATE";//设置下拉菜单可用
+    private final String SET_DATETIME = "com.geenk.action.SET_DATETIME";//设置系统时间
+    private final String BACK_SHOW = "com.huoniBack.show";//后置预览广播
 
     @Override
     public void onCreate() {
         super.onCreate();
         initLibrary();
         IntentFilter intentFilter = new IntentFilter();
-        intentFilter.addAction("com.huoniBack.show");
+        intentFilter.addAction(BACK_SHOW);
+        intentFilter.addAction(HOME_STATE);
+        intentFilter.addAction(STATUSBAR_STATE);
+        intentFilter.addAction(SET_DATETIME);
         registerReceiver(broadcastReceiver, intentFilter);
     }
 
@@ -46,7 +55,7 @@ public class BService extends Service implements HuoniScan.DisplayBarcodeDataLis
         public void onReceive(Context context, Intent intent) {
             String state = intent.getAction();
             switch (state) {
-                case "com.huoniBack.show":
+                case BACK_SHOW:
                     if (intent.getBooleanExtra("backState", true)) {
                         if (isWorked(BService.this)) {
                             return;
@@ -83,6 +92,15 @@ public class BService extends Service implements HuoniScan.DisplayBarcodeDataLis
                             return;
                         }
                     }
+                    break;
+                case HOME_STATE:
+                    SystemProperties.set(SystemSet.homeSet, String.valueOf(intent.getBooleanExtra("enable", true)));
+                    break;
+                case STATUSBAR_STATE://下拉菜单
+                    SystemProperties.set(SystemSet.menuDwon, String.valueOf(intent.getBooleanExtra("enable", true)));
+                    break;
+                case SET_DATETIME:
+                    SystemClock.setCurrentTimeMillis(intent.getLongExtra("datetime", 0));
                     break;
             }
         }
