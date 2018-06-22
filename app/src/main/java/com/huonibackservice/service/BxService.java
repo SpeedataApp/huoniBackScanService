@@ -4,7 +4,9 @@ import android.app.Service;
 import android.content.Intent;
 import android.graphics.PixelFormat;
 import android.hardware.Camera;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Message;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Gravity;
@@ -14,10 +16,17 @@ import android.view.WindowManager;
 import android.view.WindowManager.LayoutParams;
 import android.widget.LinearLayout;
 
+import com.honeywell.barcode.BarcodeBounds;
 import com.honeywell.barcode.HSMDecodeComponent;
 import com.honeywell.camera.CameraManager;
+import com.huonibackservice.DrawView;
 import com.huonibackservice.R;
 
+import org.greenrobot.eventbus.EventBus;
+import org.greenrobot.eventbus.Subscribe;
+import org.greenrobot.eventbus.ThreadMode;
+
+import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -33,6 +42,10 @@ public class BxService extends Service {
     public static HSMDecodeComponent decCom;
     private Timer timer = null;
 
+    public HSMDecodeComponent getLayout() {
+        return decCom;
+    }
+
     @Override
     public void onCreate() {
         super.onCreate();
@@ -40,6 +53,7 @@ public class BxService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        EventBus.getDefault().register(this);
         int width = Integer.parseInt(intent.getStringExtra("width"));
         int height = Integer.parseInt(intent.getStringExtra("height"));
         int marginRight = Integer.parseInt(intent.getStringExtra("marginRight"));
@@ -124,6 +138,46 @@ public class BxService extends Service {
 //        });
     }
 
+    private DrawView drawView;
+
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void showkuang(List<BarcodeBounds> barcodeBoundsList) {
+        Log.i("testttt", "showkuang: 收到 画框");
+        if (drawView != null) {
+            decCom.removeView(drawView);
+//            handler.postAtTime(runnableUi, 1000);
+        }
+        drawView = new DrawView(this, barcodeBoundsList);
+        decCom.addView(drawView);
+
+    }
+
+    public void startTimers() {
+        timer = new Timer();
+        timer.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                handler.post(runnableUi);
+                handler.postAtTime(runnableUi, 1000);
+            }
+        }, 1000);
+    }
+
+    Handler handler = new Handler();
+    // 构建Runnable对象，在runnable中更新界面
+    Runnable runnableUi = new Runnable() {
+        @Override
+        public void run() {
+            //更新界面
+            if (drawView != null) {
+                decCom.removeView(drawView);
+            }else {
+                drawView=null;
+            }
+        }
+
+    };
+
     @Override
     public void onDestroy() {
         super.onDestroy();
@@ -134,6 +188,7 @@ public class BxService extends Service {
         if (timer != null) {
             timer.cancel();
         }
+        EventBus.getDefault().unregister(this);
     }
 
 }

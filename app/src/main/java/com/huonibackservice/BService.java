@@ -12,8 +12,13 @@ import android.os.SystemClock;
 import android.os.SystemProperties;
 import android.support.annotation.Nullable;
 import android.util.Log;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.widget.LinearLayout;
 
 import com.honeywell.barcode.ActiveCamera;
+import com.honeywell.barcode.BarcodeBounds;
+import com.honeywell.barcode.HSMDecodeComponent;
 import com.honeywell.barcode.HSMDecodeResult;
 import com.honeywell.barcode.HSMDecoder;
 import com.honeywell.barcode.Symbology;
@@ -22,8 +27,11 @@ import com.huonibackservice.service.BxService;
 import com.sc100.HuoniManage;
 import com.sc100.Huoniinterface.HuoniScan;
 
+import org.greenrobot.eventbus.EventBus;
+
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.List;
 
 public class BService extends Service implements HuoniScan.DisplayBarcodeDataListener, HuoniScan.HuoniscanListener {
     private HuoniScan huoniScan;
@@ -37,6 +45,9 @@ public class BService extends Service implements HuoniScan.DisplayBarcodeDataLis
     private final String STATUSBAR_STATE = "com.geenk.action.STATUSBAR_SWITCH_STATE";//设置下拉菜单可用
     private final String SET_DATETIME = "com.geenk.action.SET_DATETIME";//设置系统时间
     private final String BACK_SHOW = "com.huoniBack.show";//后置预览广播
+    private DrawView drawView;
+    private int width = 360;
+    private int height = 640;
 
     @Override
     public void onCreate() {
@@ -48,6 +59,10 @@ public class BService extends Service implements HuoniScan.DisplayBarcodeDataLis
         intentFilter.addAction(STATUSBAR_STATE);
         intentFilter.addAction(SET_DATETIME);
         registerReceiver(broadcastReceiver, intentFilter);
+//        if (!EventBus.getDefault().isRegistered(this))
+//        {
+//            EventBus.getDefault().register(this);
+//        }
     }
 
     BroadcastReceiver broadcastReceiver = new BroadcastReceiver() {
@@ -60,6 +75,8 @@ public class BService extends Service implements HuoniScan.DisplayBarcodeDataLis
                         if (isWorked(BService.this)) {
                             return;
                         } else {
+                            width = Integer.parseInt(intent.getStringExtra("width"));
+                            width = Integer.parseInt(intent.getStringExtra("height"));
                             intents.setClass(BService.this, BxService.class);
                             intents.putExtra("width", intent.getStringExtra("width"));
                             intents.putExtra("height", intent.getStringExtra("height"));
@@ -172,11 +189,20 @@ public class BService extends Service implements HuoniScan.DisplayBarcodeDataLis
         Log.i("stw", "displayBarcodeData: 解码 ");
 //        StringBuilder result = new StringBuilder();
         String[] codeBytes = new String[hsmDecodeResults.length];
+        List<BarcodeBounds> barcodeBoundsList = new ArrayList<>();
         for (int i = 0; i < hsmDecodeResults.length; i++) {
             codeBytes[i] = hsmDecodeResults[i].getBarcodeData();
+            barcodeBoundsList.add(hsmDecodeResults[i].getBarcodeBounds());
 //            String bar = hsmDecodeResults[i].getBarcodeData();
 //            result.append("解码" + i + ":" + bar + "\n");
+
         }
+        Log.i("testttt", "displayBarcodeData: 发送 ");
+        EventBus.getDefault().post(barcodeBoundsList);
+//        View view = getApplication().getBaseContext().inflater(R.layout.布局文件名,null);
+//        LayoutInflater lf = (LayoutInflater)getBaseContext().getSystemServic(Context.LAYOUT_INFLATER_SERVICE);
+//        View view = lf.inflate(R.layout.布局文件名,null);
+
         intent.putExtra("huoniBack", codeBytes);
         //发送广播
         sendBroadcast(intent);
@@ -194,6 +220,7 @@ public class BService extends Service implements HuoniScan.DisplayBarcodeDataLis
         if (huoniScan != null) {
             huoniScan.release();
         }
+        EventBus.getDefault().unregister(this);
     }
 
     @Nullable

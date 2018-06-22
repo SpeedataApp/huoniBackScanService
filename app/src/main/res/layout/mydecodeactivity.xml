@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/float_id"
-    android:layout_width="360dp"
-    android:layout_height="540dp"
+    android:layout_width="360px"
+    android:layout_height="640px"
     android:orientation="horizontal">
 
     <com.honeywell.barcode.HSMDecodeComponent
