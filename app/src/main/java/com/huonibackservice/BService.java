@@ -6,39 +6,36 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.graphics.Color;
 import android.hardware.Camera;
 import android.os.IBinder;
 import android.os.SystemClock;
 import android.os.SystemProperties;
 import android.support.annotation.Nullable;
 import android.util.Log;
-import android.view.LayoutInflater;
-import android.view.View;
-import android.widget.LinearLayout;
+import android.widget.Toast;
 
-import com.honeywell.barcode.ActiveCamera;
 import com.honeywell.barcode.BarcodeBounds;
-import com.honeywell.barcode.HSMDecodeComponent;
 import com.honeywell.barcode.HSMDecodeResult;
 import com.honeywell.barcode.HSMDecoder;
 import com.honeywell.barcode.Symbology;
 import com.honeywell.camera.CameraManager;
+import com.honeywell.plugins.decode.DecodeResultListener;
 import com.huonibackservice.service.BxService;
-import com.sc100.HuoniManage;
-import com.sc100.Huoniinterface.HuoniScan;
+import com.speedata.hwlib.ActivationManager;
+import com.speedata.hwlib.net.DialogShowMsg;
+import com.speedata.hwlib.net.Global;
 
 import org.greenrobot.eventbus.EventBus;
+import org.greenrobot.eventbus.Subscribe;
+import org.greenrobot.eventbus.ThreadMode;
 
-import java.lang.reflect.Method;
+import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.List;
 
-public class BService extends Service implements HuoniScan.DisplayBarcodeDataListener, HuoniScan.HuoniscanListener {
-    private HuoniScan huoniScan;
+public class BService extends Service implements DecodeResultListener {
     private HSMDecoder hsmDecoder;
-    private CameraManager cameraManager;
-    private Camera camera1;
-    public Camera.Parameters parameters1;
     private Intent intents = new Intent();
     private Intent intent = new Intent();
     private final String HOME_STATE = "com.geenk.action.HOMEKEY_SWITCH_STATE";//设置home按键是否可用
@@ -52,6 +49,7 @@ public class BService extends Service implements HuoniScan.DisplayBarcodeDataLis
     @Override
     public void onCreate() {
         super.onCreate();
+        EventBus.getDefault().register(this);
         initLibrary();
         IntentFilter intentFilter = new IntentFilter();
         intentFilter.addAction(BACK_SHOW);
@@ -124,102 +122,62 @@ public class BService extends Service implements HuoniScan.DisplayBarcodeDataLis
     };
 
 
-    @SuppressWarnings("unchecked")
-    private void setCameraParams() {
-        Camera.Parameters parameters = cameraManager.getCamera().getParameters();
-        try {
-            //获取支持的参数
-            Method parametersSetEdgeMode = Camera.Parameters.class
-                    .getMethod("setEdgeMode", String.class);
-            Method parametersSetBrightnessMode = Camera.Parameters.class
-                    .getMethod("setBrightnessMode", String.class);
-            Method parametersSetContrastMode = Camera.Parameters.class
-                    .getMethod("setContrastMode", String.class);
-
-            //锐度 亮度 对比度
-            parametersSetEdgeMode.invoke(parameters, "high");
-            parametersSetBrightnessMode.invoke(parameters, "high");
-            parametersSetContrastMode.invoke(parameters, "high");
-            Method parametersGetEdgeMode = Camera.Parameters.class
-                    .getMethod("getEdgeMode");
-            Method parametersGetBrightnessMode = Camera.Parameters.class
-                    .getMethod("getBrightnessMode");
-            Method parametersGetContrastMode = Camera.Parameters.class
-                    .getMethod("getContrastMode");
-
-            //锐度亮度对比度 是否设置成功
-            String ruidu = (String) parametersGetEdgeMode.invoke(parameters);
-            String liangdu = (String) parametersGetBrightnessMode.invoke(parameters);
-            String duibidu = (String) parametersGetContrastMode.invoke(parameters);
-
-            Log.d("cameraSetting", "mlist is" + ruidu + "-----" + liangdu + "-----" + duibidu);
-
-
-        } catch (Exception e) {
-            Log.d("cameraSetting", "error is::" + Log.getStackTraceString(e));
-        }
-    }
-
-
     private void initLibrary() {
-        huoniScan = HuoniManage.getKuaishouIntance();
-        huoniScan.intScanDecode(BService.this);
-        hsmDecoder = huoniScan.getHuoniHsmDecoder();
-        hsmDecoder.setActiveCamera(ActiveCamera.REAR_FACING);
-        hsmDecoder.enableSound(false);
-        hsmDecoder.enableSymbology(Symbology.CODE39);
-        hsmDecoder.enableSymbology(Symbology.CODE128);
-        huoniScan.setdisplayBarcodeData(this);
-        huoniScan.setHuoniScanLibraryState(this);
-        cameraManager = huoniScan.getHuoniCameraManager(this);
-        cameraManager.reopenCamera();
-        camera1 = cameraManager.getCamera();
-        parameters1 = camera1.getParameters();
+        //初始化霍尼扫描解码
+        hsmDecoder = HSMDecoder.getInstance(this);
+        new ActivationManager(this).activate();
+        Camera camera1 = CameraManager.getInstance(this).getCamera();
+        Camera.Parameters parameters1 = camera1.getParameters();
         parameters1.setExposureCompensation(-3);
         parameters1.setAutoWhiteBalanceLock(true);
         parameters1.setColorEffect(Camera.Parameters.EFFECT_MONO);
         parameters1.setPreviewSize(1920, 1080);
-        setCameraParams();
         camera1.setParameters(parameters1);
+        hsmDecoder.enableSound(false);
+        hsmDecoder.addResultListener(this);
+        hsmDecoder.enableSymbology(Symbology.CODE39);
+        hsmDecoder.enableSymbology(Symbology.CODE128);
         intent.setAction("com.huoniBack.barcode");
     }
 
-    @Override
-    public void displayBarcodeData(String s, long l, HSMDecodeResult[] hsmDecodeResults) {
-        Log.i("stw", "displayBarcodeData: 解码 ");
-//        StringBuilder result = new StringBuilder();
-        String[] codeBytes = new String[hsmDecodeResults.length];
-        List<BarcodeBounds> barcodeBoundsList = new ArrayList<>();
-        for (int i = 0; i < hsmDecodeResults.length; i++) {
-            codeBytes[i] = hsmDecodeResults[i].getBarcodeData();
-            barcodeBoundsList.add(hsmDecodeResults[i].getBarcodeBounds());
-//            String bar = hsmDecodeResults[i].getBarcodeData();
-//            result.append("解码" + i + ":" + bar + "\n");
-
-        }
-        Log.i("testttt", "displayBarcodeData: 发送 ");
-        EventBus.getDefault().post(barcodeBoundsList);
-//        View view = getApplication().getBaseContext().inflater(R.layout.布局文件名,null);
-//        LayoutInflater lf = (LayoutInflater)getBaseContext().getSystemServic(Context.LAYOUT_INFLATER_SERVICE);
-//        View view = lf.inflate(R.layout.布局文件名,null);
-
-        intent.putExtra("huoniBack", codeBytes);
-        //发送广播
-        sendBroadcast(intent);
-        Log.i("stw", "displayBarcodeData: 发广播 " + hsmDecodeResults[0].getDecodeTime());
-    }
+//    @Override
+//    public void displayBarcodeData(String s, long l, HSMDecodeResult[] hsmDecodeResults) {
+//        Log.i("stw", "displayBarcodeData: 解码 ");
+////        StringBuilder result = new StringBuilder();
+//        String[] codeBytes = new String[hsmDecodeResults.length];
+//        List<BarcodeBounds> barcodeBoundsList = new ArrayList<>();
+//        for (int i = 0; i < hsmDecodeResults.length; i++) {
+//            codeBytes[i] = hsmDecodeResults[i].getBarcodeData();
+//            barcodeBoundsList.add(hsmDecodeResults[i].getBarcodeBounds());
+////            String bar = hsmDecodeResults[i].getBarcodeData();
+////            result.append("解码" + i + ":" + bar + "\n");
+//
+//        }
+//        Log.i("testttt", "displayBarcodeData: 发送 ");
+//        EventBus.getDefault().post(barcodeBoundsList);
+////        View view = getApplication().getBaseContext().inflater(R.layout.布局文件名,null);
+////        LayoutInflater lf = (LayoutInflater)getBaseContext().getSystemServic(Context.LAYOUT_INFLATER_SERVICE);
+////        View view = lf.inflate(R.layout.布局文件名,null);
+//
+//        intent.putExtra("huoniBack", codeBytes);
+//        //发送广播
+//        sendBroadcast(intent);
+//        Log.i("stw", "displayBarcodeData: 发广播 " + hsmDecodeResults[0].getDecodeTime());
+//    }
 
 
     @Override
     public void onDestroy() {
         super.onDestroy();
+        unregisterReceiver(broadcastReceiver);
 //        Toast.makeText(this, "服务被关闭", Toast.LENGTH_SHORT).show();
         if (isWorked(this)) {
             stopService(intents);
         }
-        if (huoniScan != null) {
-            huoniScan.release();
+        if (hsmDecoder != null) {
+            hsmDecoder.removeResultListener(this);
         }
+        HSMDecoder.disposeInstance();
         EventBus.getDefault().unregister(this);
     }
 
@@ -247,9 +205,70 @@ public class BService extends Service implements HuoniScan.DisplayBarcodeDataLis
         return false;
     }
 
+    /**
+     * 激活解码返回
+     *
+     * @param event
+     */
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void showDialogMsg(DialogShowMsg event) {
+        String msg = event.getMsg();
+        // 需要初始或使能条码类型
+        hsmDecoder.enableAimer(false);
+        hsmDecoder.setOverlayText("");
+        hsmDecoder.setOverlayTextColor(Color.RED);
+        switch (event.getTag()) {
+            case Global.REQUEST_PREPARE://请求服务准备
+                Logcat.d("REQUEST_PREPARE:" + msg);
+                Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
+                break;
+            case Global.REQUEST_ERROR://请求服务失败y
+                Logcat.d("error " + msg);
+                if (msg != null) {
+                    Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
+                }
+                break;
+            case Global.REQUEST_SUCCESS://请求服务成功
+                Logcat.d("REQUEST_SUCCESS:" + msg);
+                Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
+                break;
+            case Global.REGISTER_SUCCESS://激活成功 需要初始或使能条码类型
+                hsmDecoder.enableSymbology(Symbology.CODE128);
+                hsmDecoder.enableSymbology(Symbology.CODE39);
+                Logcat.d("REGISTER_SUCCESS");
+                Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
+                break;
+            case Global.REGISTER_FAILED://激活失败  也需要初始或使能条码类型
+                Logcat.d("REGISTER_FAILED:" + msg);
+                Toast.makeText(this, "激活失败", Toast.LENGTH_SHORT).show();
+                break;
+            default:
+                break;
+        }
+    }
 
     @Override
-    public void huoniLibraryState(String s) {
+    public void onHSMDecodeResult(HSMDecodeResult[] hsmDecodeResults) {
+        //************************
+        Log.i("stw", "displayBarcodeData: 解码 ");
+//        StringBuilder result = new StringBuilder();
+        String[] codeBytes = new String[hsmDecodeResults.length];
+        List<BarcodeBounds> barcodeBoundsList = new ArrayList<>();
+        for (int i = 0; i < hsmDecodeResults.length; i++) {
+            codeBytes[i] = hsmDecodeResults[i].getBarcodeData();
+            barcodeBoundsList.add(hsmDecodeResults[i].getBarcodeBounds());
+//            String bar = hsmDecodeResults[i].getBarcodeData();
+//            result.append("解码" + i + ":" + bar + "\n");
+
+        }
+        Log.i("testttt", "displayBarcodeData: 发送 ");
+        EventBus.getDefault().post(barcodeBoundsList);
+        intent.putExtra("huoniBack", codeBytes);
+        //发送广播
+        sendBroadcast(intent);
+        Log.i("stw", "displayBarcodeData: 发广播 " + hsmDecodeResults[0].getDecodeTime());
+        //***********************
 
     }
+
 }

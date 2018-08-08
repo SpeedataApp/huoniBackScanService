@@ -15,6 +15,7 @@ import android.view.View;
 import android.view.WindowManager;
 import android.view.WindowManager.LayoutParams;
 import android.widget.LinearLayout;
+import android.widget.Toast;
 
 import com.honeywell.barcode.BarcodeBounds;
 import com.honeywell.barcode.HSMDecodeComponent;
@@ -37,10 +38,13 @@ public class BxService extends Service {
     private static LayoutParams wmParams;
     //创建浮动窗口设置布局参数的对象
     private static WindowManager mWindowManager;
-    private static View mFloatView;
     private static final String TAG = "BxService";
     public static HSMDecodeComponent decCom;
     private Timer timer = null;
+    private int width;
+    private int height;
+    private int marginRight;
+    private int marginBottom;
 
     public HSMDecodeComponent getLayout() {
         return decCom;
@@ -49,19 +53,42 @@ public class BxService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
+
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        //获取WindowManagerImpl.CompatModeWrapper
+        mWindowManager = (WindowManager) getApplication().getSystemService(getApplication().WINDOW_SERVICE);
+        DisplayMetrics dm = new DisplayMetrics();
+        mWindowManager.getDefaultDisplay().getMetrics(dm);
         EventBus.getDefault().register(this);
-        int width = Integer.parseInt(intent.getStringExtra("width"));
-        int height = Integer.parseInt(intent.getStringExtra("height"));
-        int marginRight = Integer.parseInt(intent.getStringExtra("marginRight"));
-        int marginBottom = Integer.parseInt(intent.getStringExtra("marginBottom"));
+        width = Integer.parseInt(intent.getStringExtra("width"));
+        height = Integer.parseInt(intent.getStringExtra("height"));
+        marginRight = Integer.parseInt(intent.getStringExtra("marginRight"));
+        marginBottom = Integer.parseInt(intent.getStringExtra("marginBottom"));
         createFloatView(width, height, marginRight, marginBottom);
+        mWindowManager.addView(mFloatLayout, wmParams);
         Log.i(TAG, "onBind: " + width + height);
+        if (mFloatLayout != null) {
+            mWindowManager.removeView(mFloatLayout);
+            mWindowManager = null;
+        }
+        handler.postDelayed(runnable, 300);
         return super.onStartCommand(intent, flags, startId);
     }
+
+    Runnable runnable = new Runnable() {
+        @Override
+        public void run() {
+            mWindowManager = (WindowManager) getApplication().getSystemService(getApplication().WINDOW_SERVICE);
+            DisplayMetrics dm = new DisplayMetrics();
+            mWindowManager.getDefaultDisplay().getMetrics(dm);
+            createFloatView(width, height, marginRight, marginBottom);
+            mWindowManager.addView(mFloatLayout, wmParams);
+
+        }
+    };
 
     @Override
     public IBinder onBind(Intent intent) {
@@ -69,31 +96,8 @@ public class BxService extends Service {
     }
 
 
-    private void startTimer() {
-        timer = new Timer();
-        timer.schedule(new TimerTask() {
-            @Override
-            public void run() {
-                Camera camera1 = CameraManager.getInstance(BxService.this).getCamera();
-                Camera.Parameters parameters1 = camera1.getParameters();
-                parameters1.setExposureCompensation(-3);
-                parameters1.setAutoWhiteBalanceLock(true);
-                parameters1.setColorEffect(Camera.Parameters.EFFECT_MONO);
-                parameters1.setPreviewSize(1920, 1080);
-                parameters1.setAutoExposureLock(true);
-                camera1.setParameters(parameters1);
-            }
-        }, 4000);
-    }
-
     public void createFloatView(int width, int height, int marginRight, int marginBottom) {
-        startTimer();
         wmParams = new LayoutParams();
-        //获取WindowManagerImpl.CompatModeWrapper
-        mWindowManager = (WindowManager) getApplication().getSystemService(getApplication().WINDOW_SERVICE);
-//                Display display = mWindowManager.getDefaultDisplay();
-        DisplayMetrics dm = new DisplayMetrics();
-        mWindowManager.getDefaultDisplay().getMetrics(dm);
         //设置window type
         wmParams.type = LayoutParams.TYPE_PHONE;
         //设置图片格式，效果为背景透明
@@ -107,35 +111,12 @@ public class BxService extends Service {
         wmParams.height = height;
         wmParams.y = marginBottom;
         wmParams.x = marginRight;
-        //设置悬浮窗口长宽数据
-//        wmParams.width = LayoutParams.WRAP_CONTENT;
-//        wmParams.height = LayoutParams.WRAP_CONTENT;
         LayoutInflater inflater = LayoutInflater.from(getApplication());
         //获取浮动窗口视图所在布局
         mFloatLayout = (LinearLayout) inflater.inflate(R.layout.mydecodeactivity, null);
-        //添加mFloatLayout
-        mWindowManager.addView(mFloatLayout, wmParams);
         //浮动窗口按钮
         decCom = mFloatLayout.findViewById(R.id.hsm_decodeComponent);
-//        decCom.setVisibility(View.GONE);
-//        mFloatView = mFloatLayout.findViewById(R.id.float_id);
-//        mFloatLayout.measure(View.MeasureSpec.makeMeasureSpec(0,
-//                View.MeasureSpec.UNSPECIFIED), View.MeasureSpec
-//                .makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
-        //设置监听浮动窗口的触摸移动
-//        mFloatLayout.setOnTouchListener(new OnTouchListener() {
-//
-//            @Override
-//            public boolean onTouch(View v, MotionEvent event) {
-//                //getRawX是触摸位置相对于屏幕的坐标，getX是相对于按钮的坐标
-//                wmParams.x = (int) event.getRawX() - mFloatView.getMeasuredWidth() / 2;
-//                //25为状态栏的高度
-//                wmParams.y = (int) event.getRawY() - mFloatView.getMeasuredHeight() / 2 - 25;
-//                //刷新
-//                mWindowManager.updateViewLayout(mFloatLayout, wmParams);
-//                return false;
-//            }
-//        });
+
     }
 
     private DrawView drawView;
@@ -152,17 +133,6 @@ public class BxService extends Service {
 
     }
 
-    public void startTimers() {
-        timer = new Timer();
-        timer.schedule(new TimerTask() {
-            @Override
-            public void run() {
-                handler.post(runnableUi);
-                handler.postAtTime(runnableUi, 1000);
-            }
-        }, 1000);
-    }
-
     Handler handler = new Handler();
     // 构建Runnable对象，在runnable中更新界面
     Runnable runnableUi = new Runnable() {
@@ -171,8 +141,8 @@ public class BxService extends Service {
             //更新界面
             if (drawView != null) {
                 decCom.removeView(drawView);
-            }else {
-                drawView=null;
+            } else {
+                drawView = null;
             }
         }
 
@@ -182,7 +152,9 @@ public class BxService extends Service {
     public void onDestroy() {
         super.onDestroy();
         if (mFloatLayout != null) {
-            mWindowManager.removeView(mFloatLayout);
+            if (mWindowManager != null) {
+                mWindowManager.removeView(mFloatLayout);
+            }
             decCom.dispose();
         }
         if (timer != null) {
