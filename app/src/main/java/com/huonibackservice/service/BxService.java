@@ -97,6 +97,9 @@ public class BxService extends Service {
 
 
     public void createFloatView(int width, int height, int marginRight, int marginBottom) {
+//        if (timer==null) {
+//            startTimer();
+//        }
         wmParams = new LayoutParams();
         //设置window type
         wmParams.type = LayoutParams.TYPE_PHONE;
@@ -162,5 +165,20 @@ public class BxService extends Service {
         }
         EventBus.getDefault().unregister(this);
     }
-
+    private void startTimer() {
+        timer = new Timer();
+        timer.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                Camera camera1 = CameraManager.getInstance(BxService.this).getCamera();
+                Camera.Parameters parameters1 = camera1.getParameters();
+                parameters1.setExposureCompensation(-3);
+                parameters1.setAutoWhiteBalanceLock(true);
+                parameters1.setColorEffect(Camera.Parameters.EFFECT_MONO);
+                parameters1.setPreviewSize(1920, 1080);
+                parameters1.setAutoExposureLock(true);
+                camera1.setParameters(parameters1);
+            }
+        }, 4000);
+    }
 }

@@ -6,7 +6,9 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.graphics.Bitmap;
 import android.graphics.Color;
+import android.graphics.Matrix;
 import android.hardware.Camera;
 import android.os.IBinder;
 import android.os.SystemClock;
@@ -30,6 +32,7 @@ import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
 
+import java.io.ByteArrayOutputStream;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.List;
@@ -42,6 +45,7 @@ public class BService extends Service implements DecodeResultListener {
     private final String STATUSBAR_STATE = "com.geenk.action.STATUSBAR_SWITCH_STATE";//设置下拉菜单可用
     private final String SET_DATETIME = "com.geenk.action.SET_DATETIME";//设置系统时间
     private final String BACK_SHOW = "com.huoniBack.show";//后置预览广播
+    private final String BACK_TAKE_PICTURE = "com.huoniBack.takepicture";//后置霍尼拍照广播
     private DrawView drawView;
     private int width = 360;
     private int height = 640;
@@ -56,6 +60,7 @@ public class BService extends Service implements DecodeResultListener {
         intentFilter.addAction(HOME_STATE);
         intentFilter.addAction(STATUSBAR_STATE);
         intentFilter.addAction(SET_DATETIME);
+        intentFilter.addAction(BACK_TAKE_PICTURE);
         registerReceiver(broadcastReceiver, intentFilter);
 //        if (!EventBus.getDefault().isRegistered(this))
 //        {
@@ -117,6 +122,11 @@ public class BService extends Service implements DecodeResultListener {
                 case SET_DATETIME:
                     SystemClock.setCurrentTimeMillis(intent.getLongExtra("datetime", 0));
                     break;
+                case BACK_TAKE_PICTURE:
+                    takePicture();
+                    break;
+                default:
+                    break;
             }
         }
     };
@@ -132,6 +142,7 @@ public class BService extends Service implements DecodeResultListener {
         parameters1.setAutoWhiteBalanceLock(true);
         parameters1.setColorEffect(Camera.Parameters.EFFECT_MONO);
         parameters1.setPreviewSize(1920, 1080);
+        parameters1.setPictureSize(680, 480);
         camera1.setParameters(parameters1);
         hsmDecoder.enableSound(false);
         hsmDecoder.addResultListener(this);
@@ -217,6 +228,8 @@ public class BService extends Service implements DecodeResultListener {
         hsmDecoder.enableAimer(false);
         hsmDecoder.setOverlayText("");
         hsmDecoder.setOverlayTextColor(Color.RED);
+        hsmDecoder.enableSymbology(Symbology.CODE128);
+        hsmDecoder.enableSymbology(Symbology.CODE39);
         switch (event.getTag()) {
             case Global.REQUEST_PREPARE://请求服务准备
                 Logcat.d("REQUEST_PREPARE:" + msg);
@@ -250,6 +263,8 @@ public class BService extends Service implements DecodeResultListener {
     @Override
     public void onHSMDecodeResult(HSMDecodeResult[] hsmDecodeResults) {
         //************************
+
+
         Log.i("stw", "displayBarcodeData: 解码 ");
 //        StringBuilder result = new StringBuilder();
         String[] codeBytes = new String[hsmDecodeResults.length];
@@ -271,4 +286,26 @@ public class BService extends Service implements DecodeResultListener {
 
     }
 
+    private void takePicture() {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                Bitmap bitmap = hsmDecoder.getLastImage();
+                Matrix matrix = new Matrix();
+                matrix.setScale(0.2f, 0.2f);
+                bitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(),
+                        bitmap.getHeight(), matrix, true);
+                Log.i("stw", "压缩后图片的大小" + (bitmap.getByteCount() / 1024 / 1024)
+                        + "M宽度为" + bitmap.getWidth() + "高度为" + bitmap.getHeight());
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, baos);
+                byte[] bitmapByte = baos.toByteArray();
+                Log.i("stw", "onHSMDecodeResult: 照片 " + bitmapByte.length);
+                intent.putExtra("backImage", bitmapByte);
+                //发送广播
+                sendBroadcast(intent);
+            }
+        }).start();
+
+    }
 }
